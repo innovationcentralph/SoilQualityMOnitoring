@@ -8,6 +8,8 @@ class I2CLogger {
 public:
     I2CLogger(uint8_t slaveAddress); // Constructor
 
+
+
     // File Operations
     bool createFile(const char* filename);
     bool deleteFile(const char* filename);

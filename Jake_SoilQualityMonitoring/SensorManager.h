@@ -18,6 +18,7 @@ typedef struct {
 // RTOS Task Handle
 extern TaskHandle_t xTaskHandle_SensorManager;
 extern SemaphoreHandle_t xSemaphore_Sensor;
+extern bool sensorDataReady;
 
 // Global Sensor Data
 extern SensorData_t sensorData;

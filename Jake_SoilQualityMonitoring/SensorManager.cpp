@@ -8,9 +8,10 @@ ModbusRTU modbus;
 // Define the task handle
 TaskHandle_t xTaskHandle_SensorManager = NULL;
 SemaphoreHandle_t xSemaphore_Sensor = NULL;
+bool sensorDataReady = false;
 
 // Define the global sensor data
-SensorData_t sensorData = { 0.0, 0.0 };
+SensorData_t sensorData = { 0.0, 0.0, 0, 0, 0, 0, 0, 0 };
 
 DFRobot_SHT20 sht20(&Wire, SHT20_I2C_ADDR);
 
@@ -63,22 +64,27 @@ void modbusTask(void* pvParameters) {
 }
 
 void SensorManagerTask(void* pvParameters) {
+#ifdef DEBUG_SENSORS
   Serial.print("Sensor Manager running on core ");
+#endif
   Serial.println(xPortGetCoreID());
 
-  // Initialize sensor peripherals here
+// Initialize sensor peripherals here
+#ifdef DEBUG_SENSORS
   Serial.println("Initializing sensors...");
-  // For example, initialize DHT sensor, ADC, etc.
+#endif
 
   // Initialize Modbus Port as Master
-  Serial1.begin(9600, SERIAL_8N1, MASTER_RO, MASTER_DI);
-  modbus.begin(&Serial1, MASTER_EN);
+  Serial2.begin(9600, SERIAL_8N1, MASTER_RO, MASTER_DI);
+  modbus.begin(&Serial2, MASTER_EN);
   modbus.setBaudrate(9600);
   modbus.master();
 
+#ifdef DEBUG_SENSORS
   Serial.println("Modbus Master Initialized");
+#endif
 
-  uint32_t lastReadTime = millis();
+  uint32_t lastReadTime = -1 * SENSOR_READ_INTERVAL_MS;  // to read ASAP
 
   // Init SHT20 Sensor
   sht20.initSHT20();
@@ -100,7 +106,7 @@ void SensorManagerTask(void* pvParameters) {
         Serial.println(sensorData.temperature);
         Serial.print("Humidity: ");
         Serial.println(sensorData.humidity);
-        xSemaphoreGive(xSemaphore_Sensor);
+
 #endif
 
         // read moisture, soil temperature, ph, n, p, k
@@ -108,7 +114,7 @@ void SensorManagerTask(void* pvParameters) {
         uint16_t modbus_resp[16];
         bool res = modbus.readHreg(1, 0x0000, modbus_resp, 8, nullptr);
 
-        vTaskDelay(1000);  // Example delay
+        vTaskDelay(2000);  // Example delay
 
         if (res == true) {
           sensorData.soil_moisture = modbus_resp[0] / 10.0;
@@ -129,8 +135,10 @@ void SensorManagerTask(void* pvParameters) {
         } else {
           Serial.println("Error reading NPK sensor");
         }
-      }
 
+        xSemaphoreGive(xSemaphore_Sensor);
+        sensorDataReady = res ? true : false; // -----------------------------> Add checking for SHT Sensor validity
+      }
 
       // Reset timer
       lastReadTime = millis();
